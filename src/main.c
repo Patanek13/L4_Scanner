@@ -4,6 +4,8 @@
  * @brief Implementation of simple L4 scanner
  */
 
+#define _POSIX_C_SOURCE 200112L
+
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -122,16 +124,54 @@ int main(int argc, char **argv) {
   }
 
   if (verbose_flag) {
-    printf("--- Loaded values ---\n");
-    printf("Interface: %s\n", interface);
-    printf("TCP ports: %s\n", tcp_ports ? tcp_ports : "None");
-    printf("UDP ports: %s\n", udp_ports ? udp_ports : "None");
-    printf("Timeout: %d ms\n", timeout);
-    printf("Host: %s\n", host);
-    printf("-----------------------\n\n");
+    fprintf(stderr, "--- Loaded values ---\n");
+    fprintf(stderr, "Interface: %s\n", interface);
+    fprintf(stderr, "TCP ports: %s\n", tcp_ports ? tcp_ports : "None");
+    fprintf(stderr, "UDP ports: %s\n", udp_ports ? udp_ports : "None");
+    fprintf(stderr, "Timeout: %d ms\n", timeout);
+    fprintf(stderr, "Host: %s\n", host);
+    fprintf(stderr, "-----------------------\n\n");
   }
 
   // DNS resolution
+  struct addrinfo hints, *res, *record;
+  int status;
+  char IPstring[INET6_ADDRSTRLEN]; // Buffer to save ip addr as string
 
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_UNSPEC; // IP addr can be v4 also v6
+  hints.ai_socktype = SOCK_STREAM; // Standard 2way con-based byte stream
 
+  if (verbose_flag) {
+    fprintf(stderr, "Looking up IP address for %s\n", host);
+  }
+  if ((status = getaddrinfo(host, NULL, &hints, &res)) != 0) {
+    fprintf(stderr, "ERROR: getaddrinfo err: %s\n", gai_strerror(status));
+    return 1;
+  }
+  // Go through all ip addrs for DNS record 
+  for (record = res; record != NULL; record = record->ai_next) {
+    void *addr;
+    char *ipver;
+
+    // Which ver of ip ?
+    // IPv4
+    if (record->ai_family == AF_INET) {
+      struct sockaddr_in *ipv4 = (struct sockaddr_in *)record->ai_addr;
+      addr = &(ipv4->sin_addr);
+      ipver = "IPv4";
+    } else {
+      struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)record->ai_addr;
+      addr = &(ipv6->sin6_addr);
+      ipver = "IPv6";
+    }
+
+    // Convert binary ip addr to text form
+    inet_ntop(record->ai_family, addr, IPstring, sizeof(IPstring));
+    if (verbose_flag) {
+      fprintf(stderr, "Found IP address: %s (%s)\n", IPstring, ipver);
+    }
+  }
+  freeaddrinfo(res);
+  return 0;
 }
