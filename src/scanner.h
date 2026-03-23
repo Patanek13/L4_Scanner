@@ -57,5 +57,15 @@ unsigned short calculate_checksum(void *data, int len);
  */
 void calculate_tcp_hdr_checksum(struct tcphdr *tcp_header, const char *src_ip, const char *dst_ip);
 
+/*
+ * @brief function to send TCP SYN packet for IPv4
+ * @param src_ip - source IP address as a string
+ * @param dst_ip - destination IP address as a string
+ * @param src_port - source port number
+ * @param dst_port - destination port number
+ * @return void
+ */
+void send_tcp_syn_ipv4(const char *src_ip, const char *dst_ip, uint16_t src_port, uint16_t dst_port);
+
 #endif
 

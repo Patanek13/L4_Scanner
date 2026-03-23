@@ -11,6 +11,7 @@
 #include <sys/socket.h>
 #include <ifaddrs.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 
 
 #define SEQ_NUM 1311
@@ -133,4 +134,40 @@ void calculate_tcp_hdr_checksum(struct tcphdr *tcp_header, const char *src_ip, c
 
   tcp_header->check = calculate_checksum(buffer, buffer_len);
   free(buffer);
+}
+
+void send_tcp_syn_ipv4(const char *src_ip, const char *dst_ip, uint16_t src_port, uint16_t dst_port) {
+  // create socket
+  int socket = create_tcp_socket(AF_INET);
+
+  // setup struct with dst addr to sendto()
+  struct sockaddr_in dst_addr;
+  memset(&dst_addr, 0, sizeof(dst_addr));
+  dst_addr.sin_family = AF_INET;
+  dst_addr.sin_port = htons(dst_port);
+
+  // convert to binary
+  if (inet_pton(AF_INET, dst_ip, &dst_addr.sin_addr) <= 0) {
+    perror("ERROR: Invalid destination IPv4 address");
+    close(socket);
+    return;
+  }
+
+  // Fill TCP header
+  struct tcphdr tcp_header;
+  define_tcp_syn_header(&tcp_header, src_port, dst_port);
+
+  // calc and fill checksum
+  calculate_tcp_hdr_checksum(&tcp_header, src_ip, dst_ip);
+
+  // Send to network
+  ssize_t bytes_sent = sendto(socket, &tcp_header, sizeof(struct tcphdr), 0, (struct sockaddr *)&dst_addr, sizeof(dst_addr));
+
+  if (bytes_sent < 0) {
+    perror("ERROR: Sending error (sendto)");
+  } else {
+    fprintf(stderr, "Packet SYN successfully sent to %s:%d\n", dst_ip, dst_port);
+  }
+
+  close(socket);
 }
