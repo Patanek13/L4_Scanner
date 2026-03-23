@@ -1,7 +1,7 @@
 /*
  * @file main.c
  * @author Patrik Lošťák <xlostap00>
- * @brief Implementation of simple L4 scanner
+ * @brief Entrypoint of simple program for L4 scanning
  */
 
 #define _POSIX_C_SOURCE 200112L
@@ -19,9 +19,16 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+// non-ANSI func declaration hidden by c11
+extern char* strdup(const char*);
+
 #define DEFAULT_TIMEOUT 1000
 #define IFNAMSIZ 16 // max interface lenght with \0 in linux
+#define MAX_PORTS 65536 // max num of ports
 bool verbose_flag = false;
+// Use boolean arr of ports to be scanned
+bool scan_tcp[MAX_PORTS] = {false}; 
+bool scan_udp[MAX_PORTS] = {false};
 
 // Just print help message and exit program with 0
 // TODO: better help
@@ -63,6 +70,53 @@ void show_interfaces() {
   freeifaddrs(ifaddr);
   exit(0);
 }
+
+// Func that parses ports from cli and set true/false to each port
+void parse_ports(const char *port_str, bool *port_arr) {
+  if (port_str == NULL) {
+    return;
+  }
+
+  // copy of inputed port string cause of strtok modifies original one
+  char *str_copy = strdup(port_str);
+  if (!str_copy) {
+    perror("ERROR: strdup failed");
+    exit(1);
+  }
+
+  // parse ports seperated by , (22,23,24)
+  char *token = strtok(str_copy, ",");
+  while (token != NULL) {
+    // Find dash for range (1-65536)
+    char *dash = strchr(token, '-');
+
+    if (dash != NULL) { // port range
+      int start, end;
+      if (sscanf(token, "%d-%d", &start, &end) == 2) {
+        if (start >= 0 && end <= 65535 && start <= end) {
+          for (int p_idx = start; p_idx <= end; p_idx++) {
+            port_arr[p_idx] = true;
+          }
+        } else {
+          fprintf(stderr, "Invalid port range ");
+          exit(1);
+        }
+      }
+    } else { // one specific port
+      int port = atoi(token);
+      if (port >= 0 && port <= 65535) {
+        port_arr[port] = true;
+      } else {
+        fprintf(stderr, "Invalid port");
+        exit(1);
+      }
+    }
+    // Load another token after ,
+    token = strtok(NULL, ",");
+  }
+  free(str_copy); // clean up the copy
+}
+
 
 int main(int argc, char **argv) {
   int opt;
@@ -112,6 +166,9 @@ int main(int argc, char **argv) {
     }
   }
 
+  parse_ports(tcp_ports, scan_tcp);
+  parse_ports(udp_ports, scan_udp);
+
   // all dash args are parsed, HOST remains
   if (optind < argc) {
     host = argv[optind];
@@ -130,6 +187,11 @@ int main(int argc, char **argv) {
     fprintf(stderr, "UDP ports: %s\n", udp_ports ? udp_ports : "None");
     fprintf(stderr, "Timeout: %d ms\n", timeout);
     fprintf(stderr, "Host: %s\n", host);
+    fprintf(stderr, "Scanning these ports:\n");
+    for (int idx = 0; idx <= 65535; idx++) {
+      if (scan_tcp[idx]) fprintf(stderr, "TCP port: %d\n", idx);
+      if (scan_udp[idx]) fprintf(stderr, "UDP port: %d\n", idx);
+    }
     fprintf(stderr, "-----------------------\n\n");
   }
 
@@ -172,6 +234,7 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Found IP address: %s (%s)\n", IPstring, ipver);
     }
   }
+
   freeaddrinfo(res);
   return 0;
 }
