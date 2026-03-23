@@ -40,5 +40,22 @@ void define_tcp_syn_header(struct tcphdr *tcp_header, uint16_t src_port, uint16_
  */
 int get_interface_ip(const char *interface_name, int family, char *ip_buffer, size_t buffer_len);
 
+/*
+ * @brief function to calculate checksum for TCP header (based on RFC 1071)
+ * @param data - pointer to the data for which checksum is to be calculated
+ * @param len - length of the data in bytes
+ * @return checksum value as an unsigned short
+ */
+unsigned short calculate_checksum(void *data, int len);
+
+/*
+ * @brief function to calculate TCP header checksum for SYN scan
+ * @param tcp_header - pointer to TCP header struct for which checksum is to be calculated
+ * @param src_ip - source IP address as a string
+ * @param dst_ip - destination IP address as a string
+ * @return void (checksum is set in the tcp_header struct)
+ */
+void calculate_tcp_hdr_checksum(struct tcphdr *tcp_header, const char *src_ip, const char *dst_ip);
+
 #endif
 
