@@ -6,10 +6,6 @@
 #ifndef SCANNER_H
 #define SCANNER_H
 
-#define _DEFAULT_SOURCE
-#define _BSD_SOURCE
-#define _GNU_SOURCE
-
 #include <stdint.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
