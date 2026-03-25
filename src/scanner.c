@@ -16,20 +16,36 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/udp.h>
 #include <pcap/pcap.h>
+#include <net/if.h>
 
 
 #define SEQ_NUM 1311
 #define HDRSIZE 5 // words
 #define WINSIZE 65535 // bytes
 #define HDR_LEN_FIELD_SIZE 4 // header length field of IP header is 4-bit field
+#define LCC_LINK_HDR_SIZE 16 // Link-layer address length for Linux "cooked" capture 
+#define LO_LINK_HDR_SIZE 4 // Link-layer address length for OpenBSD loopback
+#define ETH_LINK_HDR_SIZE 14 // Link-layer address length for IEEE 802.3 Ethernet
+#define PADDING 3 // 3 bytes of zeros as padding 
+#define IPV6_HDR_LEN 40 // Length of IPv6 header is fixed 40 bytes
+#define DNS_PORT 53 // Just any port for get_src_ip function, we won't actually send data to it
 
 // Structure for IPv4 pseudo header
-struct pseudo_header {
+struct pseudo_header_ipv4 {
   uint32_t src_addr; // 4 bytes
   uint32_t dst_addr; // 4 bytes
-  uint8_t reserved_zero; // 1 byte (always 0)
+  uint8_t readdred_zero; // 1 byte (always 0)
   u_int8_t protocol; // 1 byte (6 for TCP)
   uint16_t length; // 2 bytes (data + header) 
+};
+
+// Structure for IPv6 pseudo header
+struct pseudo_header_ipv6 {
+  struct in6_addr src_addr; // 16 bytes
+  struct in6_addr dst_addr; // 16 bytes
+  uint32_t tcp_len; // 4 bytes (data + header)
+  uint8_t zeros[PADDING]; // 3 bytes of zeros (padding)
+  uint8_t next_hdr; // 1 byte (value 6 for TCP)
 };
 
 // Create raw socket, returns file descriptor or -1
@@ -55,39 +71,42 @@ void define_tcp_syn_header(struct tcphdr *tcp_header, uint16_t src_port, uint16_
   tcp_header->urg_ptr = 0;
 }
 
-int get_interface_ip(const char *interface_name, int family, char *ip_buffer, size_t buffer_len) {
-  struct ifaddrs *ifaddr, *ifa;
+// Zjistí přesnou zdrojovou IP adresu, kterou kernel použije k odeslání paketu
+int get_src_ip(int ip_ver, const char *dst_ip, char *my_ip, size_t my_ip_len) {
+    // Create fake UDP socket
+    int sock = socket(ip_ver, SOCK_DGRAM, 0);
+    if (sock < 0) return -1;
 
-  // Get all ifs
-  if (getifaddrs(&ifaddr) == -1) {
-    perror("ERROR: getifaddrs failed\n");
-    return -1;
-  }
-
-  // find matching ip ver with ip ver on interface
-  for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-    if (ifa->ifa_name == NULL || ifa->ifa_addr == NULL) {
-      continue;
+    if (ip_ver == AF_INET) {
+        struct sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(DNS_PORT); // Just any port, we won't actually send data
+        inet_pton(AF_INET, dst_ip, &addr.sin_addr);
+        
+        // no connection with UDP, just checks route table
+        connect(sock, (struct sockaddr*)&addr, sizeof(addr));
+        
+        struct sockaddr_in name;
+        socklen_t namelen = sizeof(name);
+        getsockname(sock, (struct sockaddr*)&name, &namelen); // Find our ip
+        inet_ntop(AF_INET, &name.sin_addr, my_ip, my_ip_len);
+    } else {
+        struct sockaddr_in6 addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin6_family = AF_INET6;
+        addr.sin6_port = htons(DNS_PORT);
+        inet_pton(AF_INET6, dst_ip, &addr.sin6_addr);
+        
+        connect(sock, (struct sockaddr*)&addr, sizeof(addr));
+        
+        struct sockaddr_in6 name;
+        socklen_t namelen = sizeof(name);
+        getsockname(sock, (struct sockaddr*)&name, &namelen);
+        inet_ntop(AF_INET6, &name.sin6_addr, my_ip, my_ip_len);
     }
-
-    if(strcmp(ifa->ifa_name, interface_name) == 0 && ifa->ifa_addr->sa_family == family) {
-      void *addr;
-      if (family == AF_INET) { // IPv4
-        struct sockaddr_in *ipv4 = (struct sockaddr_in *)ifa->ifa_addr; 
-        addr = &(ipv4->sin_addr);
-      } else { // IPv6
-        struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)ifa->ifa_addr;
-        addr = &(ipv6->sin6_addr);
-      }
-      // Convert ip addr to string format
-      inet_ntop(family, addr, ip_buffer, buffer_len);
-
-      freeifaddrs(ifaddr);
-      return 0;
-    }
-  }
-  freeifaddrs(ifaddr);
-  return -1; // Interface or IP family not found
+    close(sock);
+    return 0;
 }
 
 unsigned short calculate_checksum(void *data, int len) {
@@ -114,33 +133,33 @@ unsigned short calculate_checksum(void *data, int len) {
   return result;
 }
 
-void calculate_tcp_hdr_checksum(struct tcphdr *tcp_header, const char *src_ip, const char *dst_ip) {
-  struct pseudo_header pshdr;
+void calculate_tcp_hdr_checksum_ipv4(struct tcphdr *tcp_header, const char *src_ip, const char *dst_ip) {
+  struct pseudo_header_ipv4 pshdr;
 
   // Convert ip addrs from string to binary
   inet_pton(AF_INET, src_ip, &(pshdr.src_addr));
   inet_pton(AF_INET, dst_ip, &(pshdr.dst_addr));
 
-  pshdr.reserved_zero = 0;
+  pshdr.readdred_zero = 0;
   pshdr.protocol = IPPROTO_TCP;
   pshdr.length = htons(sizeof(struct tcphdr));
   
   // buffer for pseudo header and tcp header
-  int buffer_len = sizeof(struct pseudo_header) + sizeof(struct tcphdr);
+  int buffer_len = sizeof(struct pseudo_header_ipv4) + sizeof(struct tcphdr);
   char *buffer = malloc(buffer_len);
   if (!buffer) {
     perror("ERROR(checksum): malloc failed\n");
     exit(1);
   }
   // copy data to buffer (pseudo header + tcp header)
-  memcpy(buffer, (char *)&pshdr, sizeof(struct pseudo_header));
-  memcpy(buffer + sizeof(struct pseudo_header), tcp_header, sizeof(struct tcphdr));
+  memcpy(buffer, (char *)&pshdr, sizeof(struct pseudo_header_ipv4));
+  memcpy(buffer + sizeof(struct pseudo_header_ipv4), tcp_header, sizeof(struct tcphdr));
 
   tcp_header->check = calculate_checksum(buffer, buffer_len);
   free(buffer);
 }
 
-void send_tcp_syn_ipv4(const char *src_ip, const char *dst_ip, uint16_t src_port, uint16_t dst_port) {
+void send_tcp_syn_ipv4(const char *src_ip, const char *dst_ip, uint16_t src_port, uint16_t dst_port, bool verbose_flag) {
   // create socket
   int socket = create_tcp_socket(AF_INET);
 
@@ -162,23 +181,24 @@ void send_tcp_syn_ipv4(const char *src_ip, const char *dst_ip, uint16_t src_port
   define_tcp_syn_header(&tcp_header, src_port, dst_port);
 
   // calc and fill checksum
-  calculate_tcp_hdr_checksum(&tcp_header, src_ip, dst_ip);
+  calculate_tcp_hdr_checksum_ipv4(&tcp_header, src_ip, dst_ip);
 
   // Send to network
   ssize_t bytes_sent = sendto(socket, &tcp_header, sizeof(struct tcphdr), 0, (struct sockaddr *)&dst_addr, sizeof(dst_addr));
 
   if (bytes_sent < 0) {
-    perror("ERROR: Sending error (sendto)");
+    perror("ERROR: Sending error (sendto IPv4)\n");
   } else {
-    fprintf(stderr, "Packet SYN successfully sent to %s:%d\n", dst_ip, dst_port);
+    if (verbose_flag)
+    fprintf(stderr, "Packet SYN successfully sent to [%s]:%d\n", dst_ip, dst_port);
   }
 
   close(socket);
 }
 
-port_status_t scan_tcp_port(const char *interface, const char *src_ip, const char *dst_ip, int src_port, int dst_port, int timeout_ms) {
+port_status_t scan_tcp_port(const char *interface, const char *src_ip, const char *dst_ip, int src_port, int dst_port, int timeout_ms, bool verbose_flag, int ip_ver) {
   // Setup sniffer
-  pcap_t *pcap_handle = init_sniffer(interface, dst_ip, src_port);
+  pcap_t *pcap_handle = init_sniffer(interface, dst_ip, src_port, verbose_flag);
   if (!pcap_handle) return PORT_ERROR;
 
   // find the ethernet link header size dynamically
@@ -187,13 +207,13 @@ port_status_t scan_tcp_port(const char *interface, const char *src_ip, const cha
 
   switch (link_type) {
     case DLT_EN10MB:      // Standard ethernet and wifis
-      link_hdr_size = 14;
+      link_hdr_size = ETH_LINK_HDR_SIZE;
       break;
     case DLT_NULL:        // Loopback
-      link_hdr_size = 4;
+      link_hdr_size = LO_LINK_HDR_SIZE;
       break;
     case DLT_LINUX_SLL:   // Linux-cooked-capture (from any device)
-      link_hdr_size = 16;
+      link_hdr_size = LCC_LINK_HDR_SIZE;
       break;
     case DLT_RAW:         // Raw IP packets 
       link_hdr_size = 0;
@@ -208,19 +228,31 @@ port_status_t scan_tcp_port(const char *interface, const char *src_ip, const cha
 
   // Max 2 attempts to send
   for(int attempt = 0; attempt <= 1; attempt++) {
-    send_tcp_syn_ipv4(src_ip, dst_ip, src_port, dst_port);
+    // send SYN packet based on ip version
+    if (ip_ver == AF_INET) {
+      send_tcp_syn_ipv4(src_ip, dst_ip, src_port, dst_port, verbose_flag);
+    } else {
+      send_tcp_syn_ipv6(src_ip, dst_ip, src_port, dst_port, verbose_flag);
+    }
 
     struct pcap_pkthdr *header;
     const unsigned char *packet_data;
-    int response = sniff_response(pcap_handle, &header, &packet_data, timeout_ms);
+    int response = sniff_response(pcap_handle, &header, &packet_data, timeout_ms, verbose_flag);
 
     if (response == 1) { // Packet arrived
-      int ethernet_offset = link_hdr_size;
-      // Map ip header to find the real size
-      const struct ip *ip_header = (struct ip*)(packet_data + ethernet_offset);
-      int ip_hdr_len = ip_header->ip_hl * HDR_LEN_FIELD_SIZE;
-      // Skip ethernet header and ip header
-      const struct tcphdr *tcp_header = (struct tcphdr*)(packet_data + ethernet_offset + ip_hdr_len);
+     int ethernet_offset = link_hdr_size;
+      const struct tcphdr *tcp_header;
+
+      if (ip_ver == AF_INET) {
+          // IPv4 has variable length
+          const struct ip *ip_header = (struct ip*)(packet_data + ethernet_offset);
+          int ip_hdr_len = ip_header->ip_hl * HDR_LEN_FIELD_SIZE;
+          tcp_header = (struct tcphdr*)(packet_data + ethernet_offset + ip_hdr_len);
+      } else {
+          // Proccess IPv6 header with fixed 40 bytes
+          int ipv6_hdr_len = IPV6_HDR_LEN; 
+          tcp_header = (struct tcphdr*)(packet_data + ethernet_offset + ipv6_hdr_len);
+      }
 
       if (tcp_header->syn == 1 && tcp_header->ack == 1) {
         final_state = PORT_OPEN;
@@ -238,4 +270,69 @@ port_status_t scan_tcp_port(const char *interface, const char *src_ip, const cha
   }
   pcap_close(pcap_handle);
   return final_state;
+}
+
+void calculate_tcp_hdr_checksum_ipv6(struct tcphdr *tcp_header, const char *src_ip, const char *dst_ip) {
+  struct pseudo_header_ipv6 pshdr;
+
+  // Convert ip addrs from string to binary
+  inet_pton(AF_INET6, src_ip, &(pshdr.src_addr));
+  inet_pton(AF_INET6, dst_ip, &(pshdr.dst_addr));
+
+  pshdr.next_hdr = IPPROTO_TCP;
+  pshdr.tcp_len = htonl(sizeof(struct tcphdr));
+  memset(pshdr.zeros, 0, PADDING);
+  
+  // buffer for pseudo header and tcp header
+  int buffer_len = sizeof(struct pseudo_header_ipv6) + sizeof(struct tcphdr);
+  char *buffer = malloc(buffer_len);
+  if (!buffer) {
+    perror("ERROR(checksum): malloc failed\n");
+    exit(1);
+  }
+  // copy data to buffer (pseudo header + tcp header)
+  memcpy(buffer, (char *)&pshdr, sizeof(struct pseudo_header_ipv6));
+  memcpy(buffer + sizeof(struct pseudo_header_ipv6), tcp_header, sizeof(struct tcphdr));
+
+  tcp_header->check = calculate_checksum(buffer, buffer_len);
+  free(buffer);
+}
+
+void send_tcp_syn_ipv6(const char *src_ip, const char *dst_ip, uint16_t src_port, uint16_t dst_port, bool verbose_flag) {
+  // create socket
+  int socket = create_tcp_socket(AF_INET6);
+
+
+  // setup struct with dst addr to sendto()
+  struct sockaddr_in6 dst_addr;
+  memset(&dst_addr, 0, sizeof(dst_addr));
+  dst_addr.sin6_family = AF_INET6;
+  dst_addr.sin6_port = 0;
+
+
+  // convert to binary
+  if (inet_pton(AF_INET6, dst_ip, &dst_addr.sin6_addr) <= 0) {
+    perror("ERROR: Invalid destination IPv6 address\n");
+    close(socket);
+    return;
+  }
+
+  // Fill TCP header
+  struct tcphdr tcp_header;
+  define_tcp_syn_header(&tcp_header, src_port, dst_port);
+
+  // calc and fill checksum
+  calculate_tcp_hdr_checksum_ipv6(&tcp_header, src_ip, dst_ip);
+
+  // Send to network
+  ssize_t bytes_sent = sendto(socket, &tcp_header, sizeof(struct tcphdr), 0, (struct sockaddr *)&dst_addr, sizeof(dst_addr));
+
+  if (bytes_sent < 0) {
+    perror("ERROR: Sending error (sendto IPv6)\n");
+  } else {
+    if (verbose_flag)
+    fprintf(stderr, "Packet SYN successfully sent to [%s]:%d\n", dst_ip, dst_port);
+  }
+
+  close(socket);
 }

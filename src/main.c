@@ -27,7 +27,7 @@
 extern char* strdup(const char*);
 
 #define DEFAULT_TIMEOUT 1000
-#define IFNAMSIZ 16 // max interface lenght with \0 in linux
+#define IFNAMSIZ 16 // max interface length with \0 in linux
 #define MAX_PORTS 65535 // max num of ports
 #define SRC_PORT 54321 // random high number for source port
 bool verbose_flag = false;
@@ -123,6 +123,23 @@ void parse_ports(const char *port_str, bool *port_arr) {
   free(str_copy); // clean up the copy
 }
 
+void verbose_print(bool verbose_flag, const char *tcp_ports, const char *udp_ports, const char *interface, int timeout, const char *host) {
+  if (verbose_flag) {
+    fprintf(stderr, "--- Loaded values ---\n");
+    fprintf(stderr, "Interface: %s\n", interface);
+    fprintf(stderr, "TCP ports: %s\n", tcp_ports ? tcp_ports : "None");
+    fprintf(stderr, "UDP ports: %s\n", udp_ports ? udp_ports : "None");
+    fprintf(stderr, "Timeout: %d ms\n", timeout);
+    fprintf(stderr, "Host: %s\n\n", host);
+    fprintf(stderr, "--- Scanning these ports: ---\n");
+    for (int idx = 0; idx <= MAX_PORTS; idx++) {
+      if (scan_tcp[idx]) fprintf(stderr, "TCP port: %d\n", idx);
+      if (scan_udp[idx]) fprintf(stderr, "UDP port: %d\n", idx);
+    }
+    fprintf(stderr, "-----------------------\n\n");
+  }
+}
+
 
 int main(int argc, char **argv) {
   int opt;
@@ -186,20 +203,7 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  if (verbose_flag) {
-    fprintf(stderr, "--- Loaded values ---\n");
-    fprintf(stderr, "Interface: %s\n", interface);
-    fprintf(stderr, "TCP ports: %s\n", tcp_ports ? tcp_ports : "None");
-    fprintf(stderr, "UDP ports: %s\n", udp_ports ? udp_ports : "None");
-    fprintf(stderr, "Timeout: %d ms\n", timeout);
-    fprintf(stderr, "Host: %s\n\n", host);
-    fprintf(stderr, "--- Scanning these ports: ---\n");
-    for (int idx = 0; idx <= MAX_PORTS; idx++) {
-      if (scan_tcp[idx]) fprintf(stderr, "TCP port: %d\n", idx);
-      if (scan_udp[idx]) fprintf(stderr, "UDP port: %d\n", idx);
-    }
-    fprintf(stderr, "-----------------------\n\n");
-  }
+  verbose_print(verbose_flag, tcp_ports, udp_ports, interface, timeout, host);
 
   // DNS resolution
   struct addrinfo hints, *res, *record;
@@ -221,6 +225,7 @@ int main(int argc, char **argv) {
   for (record = res; record != NULL; record = record->ai_next) {
     void *addr;
     char *ipver;
+    int curr_ver = record->ai_family; // save current IP version
 
     // Which ver of ip ?
     // IPv4
@@ -239,29 +244,33 @@ int main(int argc, char **argv) {
     if (verbose_flag) {
       fprintf(stderr, "Found IP address: %s (%s)\n", IPstring, ipver);
     }
-  }
 
-  // TCP 
-  //TODO: ipv6, UDP
-  char my_ip[INET6_ADDRSTRLEN];
-  get_interface_ip(interface, AF_INET, my_ip, sizeof(my_ip));
-  for (int p_idx = 1; p_idx <= MAX_PORTS; p_idx++) {
-    if (scan_tcp[p_idx]) {
-      port_status_t port_state = scan_tcp_port(interface, my_ip, IPstring, SRC_PORT, p_idx, timeout);
+    char my_ip[INET6_ADDRSTRLEN]; 
+    // Get my ip addr
+    if (get_src_ip(curr_ver, IPstring, my_ip, sizeof(my_ip))) {
+      fprintf(stderr, "Unable to get %s address for interface %s. Skipping...\n", ipver, interface);
+      continue;
+    }
+    // Scan all specified ports
+    for (int p_idx = 1; p_idx <= MAX_PORTS; p_idx++) {
+      if (scan_tcp[p_idx]) {
+        port_status_t port_state = scan_tcp_port(interface, my_ip, IPstring, SRC_PORT, p_idx, timeout, verbose_flag, curr_ver);
 
-      const char *state_str = "unknown";
-      if (port_state == PORT_OPEN) {
-          state_str = "open";
-      } else if (port_state == PORT_CLOSED) {
-          state_str = "closed";
-      } else if (port_state == PORT_FILTERED) {
-          state_str = "filtered";
+        const char *state_str = "unknown";
+        if (port_state == PORT_OPEN) {
+            state_str = "open";
+        } else if (port_state == PORT_CLOSED) {
+            state_str = "closed";
+        } else if (port_state == PORT_FILTERED) {
+            state_str = "filtered";
+        }
+        printf("%s %d tcp %s\n", IPstring, p_idx, state_str);
       }
-      printf("%s %d tcp %s\n", IPstring, p_idx, state_str);
     }
   }
-  
 
+  //TODO: UDP
+ 
   freeaddrinfo(res);
   return 0;
 }
