@@ -12,8 +12,9 @@
 
 #define EXPRSIZE 256 // max size of buffer for filter expr
 #define MILISEC 1000 // num of ms in 1 sec
+#define DELAY 10000 // num of microseconds
 
-pcap_t *init_sniffer(const char *interface, const char *dst_ip, int src_port) {
+pcap_t *init_sniffer(const char *interface, const char *dst_ip, int src_port, bool verbose_flag) {
     char err_buffer[PCAP_ERRBUF_SIZE];
     pcap_t *handle;
 
@@ -40,13 +41,14 @@ pcap_t *init_sniffer(const char *interface, const char *dst_ip, int src_port) {
         exit(1);
     }
     pcap_freecode(&filter_prog);
+    if (verbose_flag)
     fprintf(stderr, "Sniffer ready on interface %s. Waiting for response from %s to port %d\n", interface, dst_ip, src_port);
 
     return handle;
 }
 
 // Sniffer response, returns 1 if packet received, 0 if timeout, -1 on error
-int sniff_response(pcap_t *handle, struct pcap_pkthdr **header, const unsigned char **packet, int timeout_ms) {
+int sniff_response(pcap_t *handle, struct pcap_pkthdr **header, const unsigned char **packet, int timeout_ms, bool verbose_flag) {
     char err_buffer[PCAP_ERRBUF_SIZE];
 
     // Set pcap into non blocking mode
@@ -63,6 +65,7 @@ int sniff_response(pcap_t *handle, struct pcap_pkthdr **header, const unsigned c
         int response = pcap_next_ex(handle, header, packet);
 
         if (response == 1) {
+            if (verbose_flag)
             fprintf(stderr, "SNIFFER: Caught matching packet of size %d bytes\n", (*header)->len);
             return 1;
         } else if (response == -1 || response == -2) {
@@ -75,10 +78,11 @@ int sniff_response(pcap_t *handle, struct pcap_pkthdr **header, const unsigned c
         long elapsed_time = (now.tv_sec - start.tv_sec) * MILISEC + (now.tv_usec - start.tv_usec) / MILISEC;
 
         if (elapsed_time >= timeout_ms) {
+            if (verbose_flag)
             fprintf(stderr, "Timeout %d ms. No response\n", timeout_ms);
             return 0;
         }
         // prevent busy waiting
-        usleep(10000);
+        usleep(DELAY);
     }
 }
