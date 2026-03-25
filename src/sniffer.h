@@ -25,6 +25,7 @@ pcap_t *init_sniffer(const char *interface, const char *dst_ip, int src_port);
  * @param handle - pointer to pcap_t handle returned by init_sniffer
  * @param header - pointer to pointer to pcap_pkthdr struct to store packet header information
  * @param packet - pointer to pointer to unsigned char array to store packet data
+ * @param timeout_ms - timeout in milliseconds to wait for a packet before returning
  * @return void
  */
 int sniff_response(pcap_t *handle, struct pcap_pkthdr **header, const unsigned char **packet, int timeout_ms);

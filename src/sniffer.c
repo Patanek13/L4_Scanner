@@ -75,7 +75,7 @@ int sniff_response(pcap_t *handle, struct pcap_pkthdr **header, const unsigned c
         long elapsed_time = (now.tv_sec - start.tv_sec) * MILISEC + (now.tv_usec - start.tv_usec) / MILISEC;
 
         if (elapsed_time >= timeout_ms) {
-            fprintf(stderr, "Timeout %d ms. No response --> Port filtered\n", timeout_ms);
+            fprintf(stderr, "Timeout %d ms. No response\n", timeout_ms);
             return 0;
         }
         // prevent busy waiting
