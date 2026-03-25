@@ -10,6 +10,13 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+typedef enum {
+    PORT_OPEN,
+    PORT_CLOSED,
+    PORT_FILTERED,
+    PORT_ERROR
+} port_status_t;
+
 /*
  * @brief function to create TCP socket for sending SYN packets
  * @param domain - AF_INET for IPv4, AF_INET6 for IPv6
@@ -62,6 +69,18 @@ void calculate_tcp_hdr_checksum(struct tcphdr *tcp_header, const char *src_ip, c
  * @return void
  */
 void send_tcp_syn_ipv4(const char *src_ip, const char *dst_ip, uint16_t src_port, uint16_t dst_port);
+
+/*
+ * @brief function to scan a TCP port by sending a SYN packet and waiting for response
+ * @param interface - name of the network interface to use for sending and sniffing
+ * @param src_ip - source IP address as a string
+ * @param dst_ip - destination IP address as a string
+ * @param src_port - source port number
+ * @param dst_port - destination port number
+ * @param timeout_ms - timeout in milliseconds to wait for a response before determining port status
+ * @return port_status_t indicating whether the port is open, closed, filtered, or if an error occurred
+ */
+port_status_t scan_tcp_port(const char *interface, const char *src_ip, const char *dst_ip, int src_port, int dst_port, int timeout_ms);
 
 #endif
 
