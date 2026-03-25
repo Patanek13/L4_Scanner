@@ -5,6 +5,9 @@
  */
 
 #define _POSIX_C_SOURCE 200112L
+#include "sniffer.h"
+#include "scanner.h"
+
 
 #include <arpa/inet.h>
 #include <ctype.h>
@@ -19,16 +22,19 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+
 // non-ANSI func declaration hidden by c11
 extern char* strdup(const char*);
 
 #define DEFAULT_TIMEOUT 1000
 #define IFNAMSIZ 16 // max interface lenght with \0 in linux
-#define MAX_PORTS 65536 // max num of ports
+#define MAX_PORTS 65535 // max num of ports
+#define SRC_PORT 54321 // random high number for source port
 bool verbose_flag = false;
 // Use boolean arr of ports to be scanned
-bool scan_tcp[MAX_PORTS] = {false}; 
-bool scan_udp[MAX_PORTS] = {false};
+// Port 65535 is on idx 65536 
+bool scan_tcp[MAX_PORTS + 1] = {false}; 
+bool scan_udp[MAX_PORTS + 1] = {false};
 
 // Just print help message and exit program with 0
 // TODO: better help
@@ -98,16 +104,16 @@ void parse_ports(const char *port_str, bool *port_arr) {
             port_arr[p_idx] = true;
           }
         } else {
-          fprintf(stderr, "Invalid port range ");
+          fprintf(stderr, "Invalid port range\n");
           exit(1);
         }
       }
     } else { // one specific port
       int port = atoi(token);
-      if (port >= 0 && port <= 65535) {
+      if (port >= 1 && port <= 65535) {
         port_arr[port] = true;
       } else {
-        fprintf(stderr, "Invalid port");
+        fprintf(stderr, "Invalid port\n");
         exit(1);
       }
     }
@@ -175,7 +181,7 @@ int main(int argc, char **argv) {
   }
 
   // Validation
-  if (host == NULL && interface == NULL) {
+  if (host == NULL) {
     fprintf(stderr, "ERROR: Host is missing\n");
     exit(1);
   }
@@ -186,9 +192,9 @@ int main(int argc, char **argv) {
     fprintf(stderr, "TCP ports: %s\n", tcp_ports ? tcp_ports : "None");
     fprintf(stderr, "UDP ports: %s\n", udp_ports ? udp_ports : "None");
     fprintf(stderr, "Timeout: %d ms\n", timeout);
-    fprintf(stderr, "Host: %s\n", host);
-    fprintf(stderr, "Scanning these ports:\n");
-    for (int idx = 0; idx <= 65535; idx++) {
+    fprintf(stderr, "Host: %s\n\n", host);
+    fprintf(stderr, "--- Scanning these ports: ---\n");
+    for (int idx = 0; idx <= MAX_PORTS; idx++) {
       if (scan_tcp[idx]) fprintf(stderr, "TCP port: %d\n", idx);
       if (scan_udp[idx]) fprintf(stderr, "UDP port: %d\n", idx);
     }
@@ -234,6 +240,27 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Found IP address: %s (%s)\n", IPstring, ipver);
     }
   }
+
+  // TCP 
+  //TODO: ipv6, UDP
+  char my_ip[INET6_ADDRSTRLEN];
+  get_interface_ip(interface, AF_INET, my_ip, sizeof(my_ip));
+  for (int p_idx = 1; p_idx <= MAX_PORTS; p_idx++) {
+    if (scan_tcp[p_idx]) {
+      port_status_t port_state = scan_tcp_port(interface, my_ip, IPstring, SRC_PORT, p_idx, timeout);
+
+      const char *state_str = "unknown";
+      if (port_state == PORT_OPEN) {
+          state_str = "open";
+      } else if (port_state == PORT_CLOSED) {
+          state_str = "closed";
+      } else if (port_state == PORT_FILTERED) {
+          state_str = "filtered";
+      }
+      printf("%s %d tcp %s\n", IPstring, p_idx, state_str);
+    }
+  }
+  
 
   freeaddrinfo(res);
   return 0;
