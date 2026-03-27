@@ -21,6 +21,7 @@
 - *(udp)* Adding complete implementation for udp scanner
 - *(Makefile)* Adding test target
 - *(tests)* Adding test_scanner.sh for testing my implementation
+- *(CHANGELOG.md)* Tracking my project progress in CHANGELOG
 
 ### 🐛 Bug Fixes
 
@@ -32,6 +33,7 @@
 - *(main)* Fixing seg fault when argument -i is not provided
 - *(main)* Fixing double free cause free in wrong func scope
 - *(main)* Replacing exit functions for a returns for better testing
+- *(Makefile)* Fix zip target: to name zip archive with my xlogin
 
 ### 💼 Other
 
