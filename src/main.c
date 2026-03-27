@@ -8,7 +8,6 @@
 #include "sniffer.h"
 #include "scanner.h"
 
-
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -23,7 +22,6 @@
 #include <unistd.h>
 #include <net/if.h>
 
-
 // non-ANSI func declaration hidden by c11
 extern char* strdup(const char*);
 
@@ -37,7 +35,6 @@ bool scan_tcp[MAX_PORTS + 1] = {false};
 bool scan_udp[MAX_PORTS + 1] = {false};
 
 // Just print help message and exit program with 0
-// TODO: better help
 void print_help() {
   printf("Usage: ./ipk-L4-scan -v -i INTERFACE [-u PORTS] [-t PORTS] HOST [-w "
          "TIMEOUT] [-h | --help]\n");
@@ -280,7 +277,7 @@ int main(int argc, char **argv) {
     if (verbose_flag) {
       fprintf(stderr, "Found IP address: %s (%s)\n", IPstring, ipver);
     }
-    freeaddrinfo(res);
+    
     char my_ip[INET6_ADDRSTRLEN]; 
     // Get my ip addr
     if (get_src_ip(curr_ver, IPstring, my_ip, sizeof(my_ip))) {
@@ -318,6 +315,7 @@ int main(int argc, char **argv) {
       }
     }
   }
+  freeaddrinfo(res);
  
   
   return 0;
