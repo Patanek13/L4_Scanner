@@ -212,6 +212,12 @@ int main(int argc, char **argv) {
     }
   }
 
+  // argument -i is required
+  if (interface == NULL) {
+    fprintf(stderr, "ERROR: Network interface (-i) is required\n");
+    exit(1);
+  }
+
   // Validate interface argument
   if (if_nametoindex(interface) == 0) {
     fprintf(stderr, "ERROR: Interface %s is missing or invalid\n", interface);
