@@ -3,14 +3,15 @@ TARGET = ipk-L4-scan
 LOGIN = xlostap00
 
 CC = gcc
-CFLAGS = -Wall -Wextra -Werror -pedantic -g -std=c11
+CFLAGS = -Wall -Wextra -Werror -pedantic -g -std=c11 -D_GNU_SOURCE -D_DEFAULT_SOURCE -D_BSD_SOURCE
+LDFLAGS = -lpcap
 
 # Find all .c files
 SRCS = $(wildcard src/*.c)
 
 all: $(TARGET)
-$(TARGET): $(SRCS)
-	$(CC) $(CFLAGS) -o $@ $^
+$(TARGET): $(SRCS) 
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 	chmod +x $@
 
 # For evaluation
@@ -22,23 +23,17 @@ NIX_ENV = nix develop --refresh "git+https://git.fit.vutbr.cz/NESFIT/dev-envs.gi
 
 # Local compilation with NIX
 nix-build:
-	$(NIX_ENV) make all
+	$(NIX_ENV) make
 
-# Local testing with NIX
-nix-run:
-	$(NIX_ENV) make run
-
-run: $(TARGET)
-	./$(TARGET)
-
-nix-clean:
-	$(NIX_ENV) make clean
+test:
+	make
+	./tests/test_scanner.sh
 
 # Archive
 zip: clean
-	zip -r $(TARGET).zip src Makefile README.md LICENSE CHANGELOG.md
+	zip -r $(TARGET).zip src tests Makefile README.md LICENSE CHANGELOG.md
 
 clean:
 	rm -f $(TARGET) $(LOGIN).zip
 
-.PHONY: all clean NixDevShellName nix-build nix-run nix-clean run zip
+.PHONY: all clean NixDevShellName nix-build nix-run nix-clean run zip test
