@@ -31,7 +31,7 @@ pcap_t *init_sniffer(const char *interface, const char *dst_ip, int src_port, in
  * @param packet - pointer to pointer to unsigned char array to store packet data
  * @param timeout_ms - timeout in milliseconds to wait for a packet before returning
  * @param verbose_flag - boolean flag to enable verbose output for debugging
- * @return void
+ * @return 1 if a packet was captured, 0 if timeout occurred, -1 on error
  */
 int sniff_response(pcap_t *handle, struct pcap_pkthdr **header, const unsigned char **packet, int timeout_ms, bool verbose_flag);
 

@@ -191,13 +191,13 @@ int main(int argc, char **argv) {
       // check for nonsenses like negative or non-numeric values
       if (optarg[0] == '\0') {
         fprintf(stderr, "ERROR: Timeout value is missing\n");
-        exit(1);
+        return(1);
       }
 
       for (size_t i = 0; optarg[i] != '\0'; i++) {
         if (!isdigit(optarg[i])) {
           fprintf(stderr, "ERROR: Timeout value must be a positive integer\n");
-          exit(1);
+          return(1);
         }
       }
 
@@ -205,20 +205,20 @@ int main(int argc, char **argv) {
       break;
     default:
       fprintf(stderr, "ERROR: Unknown argument\n");
-      exit(1);
+      return(1);
     }
   }
 
   // argument -i is required
   if (interface == NULL) {
     fprintf(stderr, "ERROR: Network interface (-i) is required\n");
-    exit(1);
+    return(1);
   }
 
   // Validate interface argument
   if (if_nametoindex(interface) == 0) {
     fprintf(stderr, "ERROR: Interface %s is missing or invalid\n", interface);
-    exit(1);
+    return(1);
   }
 
 
@@ -233,7 +233,7 @@ int main(int argc, char **argv) {
   // Validation
   if (host == NULL) {
     fprintf(stderr, "ERROR: Host is missing\n");
-    exit(1);
+    return(1);
   }
 
   verbose_print(verbose_flag, tcp_ports, udp_ports, interface, timeout, host);
