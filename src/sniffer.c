@@ -14,12 +14,12 @@
 #define MILISEC 1000 // num of ms in 1 sec
 #define DELAY 10000 // num of microseconds
 
-pcap_t *init_sniffer(const char *interface, const char *dst_ip, int src_port, bool verbose_flag) {
+pcap_t *init_sniffer(const char *interface, const char *dst_ip, int src_port, int dst_port, bool verbose_flag, int protocol) {
     char err_buffer[PCAP_ERRBUF_SIZE];
     pcap_t *handle;
 
     // Open NIC for sniffing
-    handle = pcap_open_live(interface, BUFSIZ, 0, 1000, err_buffer);
+    handle = pcap_open_live(interface, BUFSIZ, 0, 1, err_buffer);
     if (handle == NULL) {
         fprintf(stderr, "ERROR: pcap_open_live failed\n");
         exit(1);
@@ -27,7 +27,12 @@ pcap_t *init_sniffer(const char *interface, const char *dst_ip, int src_port, bo
 
     // create text filter (same in wireshark)
     char filter_expr[EXPRSIZE];
-    snprintf(filter_expr, sizeof(filter_expr), "src host %s and tcp dst port %d", dst_ip, src_port);
+    if (protocol == IPPROTO_TCP) {
+        snprintf(filter_expr, sizeof(filter_expr), "src host %s and tcp dst port %d and tcp src port %d", dst_ip, src_port, dst_port);
+    } else {
+        snprintf(filter_expr, sizeof(filter_expr), "src host %s and (icmp or icmp6)", dst_ip);
+    }
+    
     // compile filter into binary
     struct bpf_program filter_prog;
     if (pcap_compile(handle, &filter_prog, filter_expr, 0, PCAP_NETMASK_UNKNOWN) == -1) {

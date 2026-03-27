@@ -17,10 +17,12 @@
  * @param interface - name of the network interface to sniff on (e.g., "eth0", "wlan0")
  * @param dst_ip - destination IP address to filter for (as a string)
  * @param src_port - source port number to filter for
+ * @param dst_port - destination port number
  * @param verbose_flag - boolean flag to enable verbose output for debugging
+ * @param protocol - IP protocol number (IPPROTO_TCP for TCP, IPPROTO_UDP for UDP)
  * @return pointer to pcap_t handle on success, NULL on failure
  */
-pcap_t *init_sniffer(const char *interface, const char *dst_ip, int src_port, bool verbose_flag);
+pcap_t *init_sniffer(const char *interface, const char *dst_ip, int src_port, int dst_port, bool verbose_flag, int protocol);
 
 /*
  * @brief function to start sniffing for packets
