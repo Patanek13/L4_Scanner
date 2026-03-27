@@ -21,13 +21,13 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <net/if.h>
 
 
 // non-ANSI func declaration hidden by c11
 extern char* strdup(const char*);
 
-#define DEFAULT_TIMEOUT 1000
-#define IFNAMSIZ 16 // max interface length with \0 in linux
+#define DEFAULT_TIMEOUT 1000 // ms
 #define MAX_PORTS 65535 // max num of ports
 #define SRC_PORT 54321 // random high number for source port
 bool verbose_flag = false;
@@ -41,6 +41,15 @@ bool scan_udp[MAX_PORTS + 1] = {false};
 void print_help() {
   printf("Usage: ./ipk-L4-scan -v -i INTERFACE [-u PORTS] [-t PORTS] HOST [-w "
          "TIMEOUT] [-h | --help]\n");
+  printf("Options:\n");
+  printf("  -v                Enable verbose output for debugging\n");
+  printf("  -i INTERFACE      Specify the network interface to use for scanning (required)\n"
+  "                    Use -i alone to list all available interfaces\n");
+  printf("  -t PORTS          Comma-separated list of TCP ports to scan (e.g., "
+         "22,80,443) or ranges (e.g., 1-1024)\n");
+  printf("  -u PORTS          Comma-separated list of UDP ports to scan (e.g., 53,123) or ranges (e.g., 1-1024)\n");
+  printf("  -w TIMEOUT        Timeout in milliseconds to wait for a response before determining port status (default: 1000 ms)\n");
+  printf("  -h, --help        Show this help message and exit\n");
   exit(0);
 }
 
@@ -105,6 +114,7 @@ void parse_ports(const char *port_str, bool *port_arr) {
           }
         } else {
           fprintf(stderr, "Invalid port range\n");
+          free(str_copy);
           exit(1);
         }
       }
@@ -114,6 +124,7 @@ void parse_ports(const char *port_str, bool *port_arr) {
         port_arr[port] = true;
       } else {
         fprintf(stderr, "Invalid port\n");
+        free(str_copy);
         exit(1);
       }
     }
@@ -180,7 +191,19 @@ int main(int argc, char **argv) {
       udp_ports = optarg;
       break;
     case 'w':
-      // TODO: check for nonsenses
+      // check for nonsenses like negative or non-numeric values
+      if (optarg[0] == '\0') {
+        fprintf(stderr, "ERROR: Timeout value is missing\n");
+        exit(1);
+      }
+
+      for (size_t i = 0; optarg[i] != '\0'; i++) {
+        if (!isdigit(optarg[i])) {
+          fprintf(stderr, "ERROR: Timeout value must be a positive integer\n");
+          exit(1);
+        }
+      }
+
       timeout = atoi(optarg);
       break;
     default:
@@ -188,6 +211,13 @@ int main(int argc, char **argv) {
       exit(1);
     }
   }
+
+  // Validate interface argument
+  if (if_nametoindex(interface) == 0) {
+    fprintf(stderr, "ERROR: Interface %s is missing or invalid\n", interface);
+    exit(1);
+  }
+
 
   parse_ports(tcp_ports, scan_tcp);
   parse_ports(udp_ports, scan_udp);
@@ -244,7 +274,7 @@ int main(int argc, char **argv) {
     if (verbose_flag) {
       fprintf(stderr, "Found IP address: %s (%s)\n", IPstring, ipver);
     }
-
+    freeaddrinfo(res);
     char my_ip[INET6_ADDRSTRLEN]; 
     // Get my ip addr
     if (get_src_ip(curr_ver, IPstring, my_ip, sizeof(my_ip))) {
@@ -283,6 +313,6 @@ int main(int argc, char **argv) {
     }
   }
  
-  freeaddrinfo(res);
+  
   return 0;
 }
