@@ -17,6 +17,7 @@
 #include <netinet/udp.h>
 #include <pcap/pcap.h>
 #include <net/if.h>
+#include <netinet/icmp6.h>
 
 
 #define SEQ_NUM 1311
@@ -198,7 +199,7 @@ void send_tcp_syn_ipv4(const char *src_ip, const char *dst_ip, uint16_t src_port
 
 port_status_t scan_tcp_port(const char *interface, const char *src_ip, const char *dst_ip, int src_port, int dst_port, int timeout_ms, bool verbose_flag, int ip_ver) {
   // Setup sniffer
-  pcap_t *pcap_handle = init_sniffer(interface, dst_ip, src_port, dst_port, verbose_flag);
+  pcap_t *pcap_handle = init_sniffer(interface, dst_ip, src_port, dst_port, verbose_flag, IPPROTO_TCP);
   if (!pcap_handle) return PORT_ERROR;
 
   // find the ethernet link header size dynamically
@@ -429,4 +430,74 @@ void send_udp_ipv6(const char *src_ip, const char *dst_ip, uint16_t src_port, ui
   }
 
   close(socketfd);
+}
+
+port_status_t scan_udp_port(const char *interface, const char *src_ip, const char *dst_ip, int src_port, int dst_port, int timeout_ms, bool verbose_flag, int ip_ver) {
+  // Setup sniffer
+  pcap_t *pcap_handle = init_sniffer(interface, dst_ip, src_port, dst_port, verbose_flag, IPPROTO_UDP);
+  if (!pcap_handle) return PORT_ERROR;
+
+  // find the ethernet link header size dynamically
+  int link_type = pcap_datalink(pcap_handle);
+  int link_hdr_size = 0;
+
+  switch (link_type) {
+    case DLT_EN10MB:      // Standard ethernet and wifis
+      link_hdr_size = ETH_LINK_HDR_SIZE;
+      break;
+    case DLT_NULL:        // Loopback
+      link_hdr_size = LO_LINK_HDR_SIZE;
+      break;
+    case DLT_LINUX_SLL:   // Linux-cooked-capture (from any device)
+      link_hdr_size = LCC_LINK_HDR_SIZE;
+      break;
+    case DLT_RAW:         // Raw IP packets 
+      link_hdr_size = 0;
+      break;
+    default:
+      fprintf(stderr, "ERROR: Unsupported link layer type (%d) on interface %s\n", link_type, interface);
+      pcap_close(pcap_handle);
+      return PORT_ERROR;
+  }
+
+  // Other ports open
+  port_status_t final_state = PORT_OPEN; // default val
+
+  // Send UDP packet
+  if (ip_ver == AF_INET) {
+    send_udp_ipv4(src_ip, dst_ip, src_port, dst_port, verbose_flag);
+  } else {
+    send_udp_ipv6(src_ip, dst_ip, src_port, dst_port, verbose_flag);
+  }
+
+  struct pcap_pkthdr *header;
+  const unsigned char *packet_data;
+  // Wait for response
+  int response = sniff_response(pcap_handle, &header, &packet_data, timeout_ms, verbose_flag);
+
+  if (response == 1) { // ICMP arrived
+    int ethernet_offset = link_hdr_size;
+
+    if (ip_ver == AF_INET) {
+      // Proccess ICMP header
+      const struct ip *ip_header = (struct ip*)(packet_data + ethernet_offset);
+      int ip_hdr_len = ip_header->ip_hl * HDR_LEN_FIELD_SIZE;
+      const struct icmphdr *icmp_header = (struct icmphdr*)(packet_data + ethernet_offset + ip_hdr_len);
+      // ICMP type 3 code 3 ---> port closed
+      if (icmp_header->type == ICMP_DEST_UNREACH && icmp_header->code == ICMP_PORT_UNREACH) {
+        final_state = PORT_CLOSED;
+      }
+    } else {
+      // Proccess ICMPv6 header
+      int ipv6_hdr_len = IPV6_HDR_LEN; 
+      const struct icmp6_hdr *icmp6_header = (struct icmp6_hdr*)(packet_data + ethernet_offset + ipv6_hdr_len);
+      // ICMPv6 type 1 code 4 ---> port closed
+      if (icmp6_header->icmp6_type == ICMP6_DST_UNREACH && icmp6_header->icmp6_code == ICMP6_DST_UNREACH_NOPORT) {
+        final_state = PORT_CLOSED;
+      }
+    }
+  }
+  // If response == 0 --> timeout --> port is open|filtered
+  pcap_close(pcap_handle);
+  return final_state;
 }

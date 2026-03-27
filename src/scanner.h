@@ -127,5 +127,19 @@ void send_udp_ipv4(const char *src_ip, const char *dst_ip, uint16_t src_port, ui
  */
 void send_udp_ipv6(const char *src_ip, const char *dst_ip, uint16_t src_port, uint16_t dst_port, bool verbose_flag);
 
+/*
+ * @brief function to scan a UDP port by sending a UDP packet and waiting for response
+ * @param interface - name of the network interface to use for sending and sniffing
+ * @param src_ip - source IP address as a string
+ * @param dst_ip - destination IP address as a string
+ * @param src_port - source port number
+ * @param dst_port - destination port number
+ * @param timeout_ms - timeout in milliseconds to wait for a response before determining port status
+ * @param verbose_flag - boolean flag to enable verbose output for debugging
+ * @param ip_ver - IP version (AF_INET for IPv4, AF_INET6 for IPv6)
+ * @return port_status_t indicating whether the port is open, closed, filtered, or if an error occurred
+ */
+port_status_t scan_udp_port(const char *interface, const char *src_ip, const char *dst_ip, int src_port, int dst_port, int timeout_ms, bool verbose_flag, int ip_ver);
+
 #endif
 
