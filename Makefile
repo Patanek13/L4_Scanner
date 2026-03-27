@@ -31,7 +31,7 @@ test:
 
 # Archive
 zip: clean
-	zip -r $(TARGET).zip src tests Makefile README.md LICENSE CHANGELOG.md
+	zip -r $(LOGIN).zip src tests Makefile README.md LICENSE CHANGELOG.md
 
 clean:
 	rm -f $(TARGET) $(LOGIN).zip
