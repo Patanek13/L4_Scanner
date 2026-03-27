@@ -99,7 +99,7 @@ void parse_ports(const char *port_str, bool *port_arr) {
     if (dash != NULL) { // port range
       int start, end;
       if (sscanf(token, "%d-%d", &start, &end) == 2) {
-        if (start >= 0 && end <= 65535 && start <= end) {
+        if (start >= 0 && end <= MAX_PORTS && start <= end) {
           for (int p_idx = start; p_idx <= end; p_idx++) {
             port_arr[p_idx] = true;
           }
@@ -110,7 +110,7 @@ void parse_ports(const char *port_str, bool *port_arr) {
       }
     } else { // one specific port
       int port = atoi(token);
-      if (port >= 1 && port <= 65535) {
+      if (port >= 1 && port <= MAX_PORTS) {
         port_arr[port] = true;
       } else {
         fprintf(stderr, "Invalid port\n");
@@ -252,9 +252,9 @@ int main(int argc, char **argv) {
       continue;
     }
     // Scan all specified ports
-    for (int p_idx = 1; p_idx <= MAX_PORTS; p_idx++) {
-      if (scan_tcp[p_idx]) {
-        port_status_t port_state = scan_tcp_port(interface, my_ip, IPstring, SRC_PORT, p_idx, timeout, verbose_flag, curr_ver);
+    for (int tcp_idx = 1; tcp_idx <= MAX_PORTS; tcp_idx++) {
+      if (scan_tcp[tcp_idx]) {
+        port_status_t port_state = scan_tcp_port(interface, my_ip, IPstring, SRC_PORT, tcp_idx, timeout, verbose_flag, curr_ver);
 
         const char *state_str = "unknown";
         if (port_state == PORT_OPEN) {
@@ -264,12 +264,24 @@ int main(int argc, char **argv) {
         } else if (port_state == PORT_FILTERED) {
             state_str = "filtered";
         }
-        printf("%s %d tcp %s\n", IPstring, p_idx, state_str);
+        printf("%s %d tcp %s\n", IPstring, tcp_idx, state_str);
+      }
+    }
+
+    for (int udp_idx = 1; udp_idx <= MAX_PORTS; udp_idx++) {
+      if (scan_udp[udp_idx]) {
+        port_status_t port_state = scan_udp_port(interface, my_ip, IPstring, SRC_PORT, udp_idx, timeout, verbose_flag, curr_ver);
+
+        const char *state_str = "unknown";
+        if (port_state == PORT_OPEN) {
+            state_str = "open";
+        } else if (port_state == PORT_CLOSED) {
+            state_str = "closed";
+        }
+        printf("%s %d udp %s\n", IPstring, udp_idx, state_str);
       }
     }
   }
-
-  //TODO: UDP
  
   freeaddrinfo(res);
   return 0;
