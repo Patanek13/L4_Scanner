@@ -106,5 +106,26 @@ void calculate_tcp_hdr_checksum_ipv6(struct tcphdr *tcp_header, const char *src_
  */
 void send_tcp_syn_ipv6(const char *src_ip, const char *dst_ip, uint16_t src_port, uint16_t dst_port, bool verbose_flag);
 
+/*
+ * @brief function to send UDP packet for IPv4
+ * @param dst_ip - destination IP address as a string
+ * @param src_port - source port number
+ * @param dst_port - destination port number
+ * @param verbose_flag - boolean flag to enable verbose output for debugging
+ * @return void
+ */
+void send_udp_ipv4(const char *src_ip, const char *dst_ip, uint16_t src_port, uint16_t dst_port, bool verbose_flag);
+
+/*
+ * @brief function to send UDP packet for IPv6
+ * @param src_ip - source IP address as a string
+ * @param dst_ip - destination IP address as a string
+ * @param src_port - source port number
+ * @param dst_port - destination port number
+ * @param verbose_flag - boolean flag to enable verbose output for debugging
+ * @return void
+ */
+void send_udp_ipv6(const char *src_ip, const char *dst_ip, uint16_t src_port, uint16_t dst_port, bool verbose_flag);
+
 #endif
 

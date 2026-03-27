@@ -198,7 +198,7 @@ void send_tcp_syn_ipv4(const char *src_ip, const char *dst_ip, uint16_t src_port
 
 port_status_t scan_tcp_port(const char *interface, const char *src_ip, const char *dst_ip, int src_port, int dst_port, int timeout_ms, bool verbose_flag, int ip_ver) {
   // Setup sniffer
-  pcap_t *pcap_handle = init_sniffer(interface, dst_ip, src_port, verbose_flag);
+  pcap_t *pcap_handle = init_sniffer(interface, dst_ip, src_port, dst_port, verbose_flag);
   if (!pcap_handle) return PORT_ERROR;
 
   // find the ethernet link header size dynamically
@@ -335,4 +335,98 @@ void send_tcp_syn_ipv6(const char *src_ip, const char *dst_ip, uint16_t src_port
   }
 
   close(socket);
+}
+
+void send_udp_ipv4(const char *src_ip, const char *dst_ip, uint16_t src_port, uint16_t dst_port, bool verbose_flag) {
+  // create raw socket for UDP
+  int socketfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (socketfd < 0) {
+    perror("ERROR: Failed to create UDP socket");
+    return;
+  }
+
+  // Bind to source port
+  struct sockaddr_in src_addr;
+  memset(&src_addr, 0, sizeof(src_addr));
+  src_addr.sin_family = AF_INET;
+  src_addr.sin_port = htons(src_port);
+  inet_pton(AF_INET, src_ip, &src_addr.sin_addr);
+
+  if (bind(socketfd, (struct sockaddr *)&src_addr, sizeof(src_addr)) < 0) {
+    perror("ERROR: Failed to bind UDP socket");
+    close(socketfd);
+    return;
+  }
+
+  // setup struct with dst addr to sendto()
+  struct sockaddr_in dst_addr;
+  memset(&dst_addr, 0, sizeof(dst_addr));
+  dst_addr.sin_family = AF_INET;
+  dst_addr.sin_port = htons(dst_port);
+
+  // convert to binary
+  if (inet_pton(AF_INET, dst_ip, &dst_addr.sin_addr) <= 0) {
+    perror("ERROR: Invalid destination IPv4 address\n");
+    close(socketfd);
+    return;
+  }
+
+  // Just send empty UDP packet 
+  ssize_t bytes_sent = sendto(socketfd, NULL, 0, 0, (struct sockaddr *)&dst_addr, sizeof(dst_addr));
+
+  if (bytes_sent < 0) {
+    perror("ERROR: Sending error (sendto UDP IPv4)\n");
+  } else {
+    if (verbose_flag)
+    fprintf(stderr, "UDP packet successfully sent to [%s]:%d\n", dst_ip, dst_port);
+  }
+
+  close(socketfd);
+}
+
+void send_udp_ipv6(const char *src_ip, const char *dst_ip, uint16_t src_port, uint16_t dst_port, bool verbose_flag) {
+  // create raw socket for UDP
+  int socketfd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+  if (socketfd < 0) {
+    perror("ERROR: Failed to create UDP socket");
+    return;
+  }
+
+  // Bind to source port
+  struct sockaddr_in6 src_addr;
+  memset(&src_addr, 0, sizeof(src_addr));
+  src_addr.sin6_family = AF_INET6;
+  src_addr.sin6_port = htons(src_port);
+  inet_pton(AF_INET6, src_ip, &src_addr.sin6_addr);
+
+  if (bind(socketfd, (struct sockaddr *)&src_addr, sizeof(src_addr)) < 0) {
+    perror("ERROR: Failed to bind UDP socket");
+    close(socketfd);
+    return;
+  }
+
+  // setup struct with dst addr to sendto()
+  struct sockaddr_in6 dst_addr;
+  memset(&dst_addr, 0, sizeof(dst_addr));
+  dst_addr.sin6_family = AF_INET6;
+  dst_addr.sin6_port = htons(dst_port);
+
+  // convert to binary
+  if (inet_pton(AF_INET6, dst_ip, &dst_addr.sin6_addr) <= 0) {
+    perror("ERROR: Invalid destination IPv6 address\n");
+    close(socketfd);
+    return;
+  }
+
+  // Just send empty UDP packet 
+  ssize_t bytes_sent = sendto(socketfd, NULL, 0, 0, (struct sockaddr *)&dst_addr, sizeof(dst_addr));
+
+  if (bytes_sent < 0) {
+    perror("ERROR: Sending error (sendto UDP IPv6)\n");
+  } else {
+    if (verbose_flag)
+    fprintf(stderr, "UDP packet successfully sent to [%s]:%d\n", dst_ip, dst_port);
+  }
+
+  close(socketfd);
 }
