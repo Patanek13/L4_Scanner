@@ -5,3 +5,6 @@ ipk-L4-scan
 *.bak
 *.zip
 *.tar.gz
+*.toml
+*.json
+validate.py
