@@ -25,8 +25,12 @@ NIX_ENV = nix develop --refresh "git+https://git.fit.vutbr.cz/NESFIT/dev-envs.gi
 nix-build:
 	$(NIX_ENV) make
 
+# Unity tests and integration tests
 test:
 	make
+	$(CC) $(CFLAGS) tests/test_scanner.c tests/unity/unity.c src/scanner.c src/sniffer.c -o test_scanner $(LDFLAGS)
+	@echo "--- RUNNING C UNIT TESTS ---"
+	./test_scanner
 	./tests/test_scanner.sh
 
 # Archive
@@ -34,6 +38,6 @@ zip: clean
 	zip -r $(LOGIN).zip src tests Makefile README.md LICENSE CHANGELOG.md
 
 clean:
-	rm -f $(TARGET) $(LOGIN).zip
+	rm -f $(TARGET) $(LOGIN).zip test_scanner 
 
-.PHONY: all clean NixDevShellName nix-build nix-run nix-clean run zip test
+.PHONY: all clean NixDevShellName nix-build run zip test
