@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# ==========================================
-#  L4 SCANNER - AUTOMATED TEST SUITE
-# ==========================================
+# ==============================================
+#  L4 SCANNER - AUTOMATED INTEGRATION TEST SUITE
+# ==============================================
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 BIN="$SCRIPT_DIR/../ipk-L4-scan"
 
 echo -e "${BLUE}==========================================${NC}"
-echo -e "${BLUE}   STARTING AUTOMATED TEST SUITE          ${NC}"
+echo -e "${BLUE}   STARTING INTEGRATION TEST SUITE        ${NC}"
 echo -e "${BLUE}==========================================${NC}\n"
 
 # ------------------------------------------
@@ -107,6 +107,7 @@ run_test "test_arg_timeout_negative" "" "$BIN -i lo -t 80 -w -5 127.0.0.1 >/dev/
 run_test "test_arg_timeout_empty" "" "$BIN -i lo -t 80 -w '' 127.0.0.1 >/dev/null" 1
 run_test "test_arg_tcp_port_zero" "" "$BIN -i lo -t 0 127.0.0.1 >/dev/null" 1
 run_test "test_arg_tcp_port_too_high" "" "$BIN -i lo -t 70000 127.0.0.1 >/dev/null" 1
+run_test "test_arg_tcp_port_nonnumeric" "" "$BIN -i lo -t 443abc 127.0.0.1 >/dev/null" 1
 run_test "test_arg_tcp_bad_range_desc" "" "$BIN -i lo -t 100-10 127.0.0.1 >/dev/null" 1
 run_test "test_arg_tcp_range_out_of_bounds" "" "$BIN -i lo -t 65535-65536 127.0.0.1 >/dev/null" 1
 run_test "test_arg_udp_port_zero" "" "$BIN -i lo -u 0 127.0.0.1 >/dev/null" 1
