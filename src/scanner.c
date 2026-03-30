@@ -72,7 +72,7 @@ void define_tcp_syn_header(struct tcphdr *tcp_header, uint16_t src_port, uint16_
   tcp_header->urg_ptr = 0;
 }
 
-// Zjistí přesnou zdrojovou IP adresu, kterou kernel použije k odeslání paketu
+// Get local IP address for given destination IP and interface, returns 0 on success, -1 on failure
 int get_src_ip(int ip_ver, const char *dst_ip, char *my_ip, size_t my_ip_len) {
     // Create fake UDP socket
     int sock = socket(ip_ver, SOCK_DGRAM, 0);
@@ -109,7 +109,8 @@ int get_src_ip(int ip_ver, const char *dst_ip, char *my_ip, size_t my_ip_len) {
     close(sock);
     return 0;
 }
-
+// Logic for checksum calculation adapted from RFC 1071 and from
+// https://www.geeksforgeeks.org/computer-networks/calculation-of-tcp-checksum/
 unsigned short calculate_checksum(void *data, int len) {
   unsigned short *buffer = data;
   unsigned int sum = 0;

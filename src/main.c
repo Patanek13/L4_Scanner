@@ -116,6 +116,14 @@ void parse_ports(const char *port_str, bool *port_arr) {
         }
       }
     } else { // one specific port
+      // check for non-numeric chars in port number
+      for (size_t i = 0; token[i] != '\0'; i++) {
+        if (!isdigit(token[i])) {
+          fprintf(stderr, "Invalid port number format\n");
+          free(str_copy);
+          exit(1);
+        }
+      }
       int port = atoi(token);
       if (port >= 1 && port <= MAX_PORTS) {
         port_arr[port] = true;

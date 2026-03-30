@@ -1,7 +1,7 @@
 /*
  * @file scanner.h
  * @author Patrik Lošťák <xlostap00>
- * @brief Function definitions for scan functions
+ * @brief Function declarations for scan functions
  */
 #ifndef SCANNER_H
 #define SCANNER_H

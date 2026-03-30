@@ -1,7 +1,7 @@
 /*
  * @file sniffer.h
  * @author Patrik Lošťák <xlostap00>
- * @brief Function definitions for packet sniffer functions
+ * @brief Function declarations for packet sniffer functions
  */
 
 #ifndef SNIFFER_H
