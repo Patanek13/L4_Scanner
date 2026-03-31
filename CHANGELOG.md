@@ -37,6 +37,8 @@
 - *(main)* Replacing exit functions for a returns for better testing
 - *(Makefile)* Fix zip target: to name zip archive with my xlogin
 - *(Makefile)* Fixing test target
+- *(main)* Fixing memory leaks when terminating program with SIGINT or SIGTERM
+- *(main)* Moving definition of global var handle to sniffer.c because of linker problems with test_scanner.c
 
 ### 💼 Other
 
@@ -47,11 +49,13 @@
 
 - Fixing and adding aditional documentations
 - *(README.md)* Adding program documentation into README.md
+- *(CHANGELOG.md)* Updating changelog file
 
 ### 🧪 Testing
 
 - *(Unity tests)* Adding implementation for testing with unity tests
 - *(Integration tests)* Adding test for invalid port number format and screenshot of wireshark testing
+- *(test_scanner.c)* Adding tests for SIGNIT/SIGTERM termination of program with checking for mem leaks
 
 ### Possible future features
 
