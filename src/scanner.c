@@ -31,6 +31,8 @@
 #define IPV6_HDR_LEN 40 // Length of IPv6 header is fixed 40 bytes
 #define DNS_PORT 53 // Just any port for get_src_ip function, we won't actually send data to it
 
+extern pcap_t *global_handle;
+
 // Structure for IPv4 pseudo header
 struct pseudo_header_ipv4 {
   uint32_t src_addr; // 4 bytes
@@ -222,6 +224,7 @@ port_status_t scan_tcp_port(const char *interface, const char *src_ip, const cha
       break;
     default:
       fprintf(stderr, "ERROR: Unsupported link layer type (%d) on interface %s\n", link_type, interface);
+      global_handle = NULL;
       pcap_close(pcap_handle);
       return PORT_ERROR;
   }
@@ -270,6 +273,7 @@ port_status_t scan_tcp_port(const char *interface, const char *src_ip, const cha
       break;
     }
   }
+  global_handle = NULL;
   pcap_close(pcap_handle);
   return final_state;
 }
@@ -457,6 +461,7 @@ port_status_t scan_udp_port(const char *interface, const char *src_ip, const cha
       break;
     default:
       fprintf(stderr, "ERROR: Unsupported link layer type (%d) on interface %s\n", link_type, interface);
+      global_handle = NULL;
       pcap_close(pcap_handle);
       return PORT_ERROR;
   }
@@ -499,6 +504,7 @@ port_status_t scan_udp_port(const char *interface, const char *src_ip, const cha
     }
   }
   // If response == 0 --> timeout --> port is open|filtered
+  global_handle = NULL;
   pcap_close(pcap_handle);
   return final_state;
 }

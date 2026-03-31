@@ -13,6 +13,7 @@ NC='\033[0m' # No Color
 PASSED=0
 FAILED=0
 TOTAL=0
+SKIPPED=0
 
 # Find executable path
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
@@ -55,6 +56,63 @@ run_test() {
         echo -e "       ${YELLOW}Output:${NC} $OUTPUT"
         ((FAILED++))
     fi
+}
+
+# Run scanner under valgrind and terminate it using a signal.
+# Test is skipped when tooling or permissions are not available.
+run_valgrind_signal_test() {
+    local test_name="$1"
+    local signal_name="$2"
+
+    if ! command -v valgrind >/dev/null 2>&1; then
+        echo -e "[ ${YELLOW}SKIP${NC} ] $test_name (valgrind not installed)"
+        ((SKIPPED++))
+        return
+    fi
+
+    if ! command -v timeout >/dev/null 2>&1; then
+        echo -e "[ ${YELLOW}SKIP${NC} ] $test_name (timeout not installed)"
+        ((SKIPPED++))
+        return
+    fi
+
+    if ! sudo -n true >/dev/null 2>&1; then
+        echo -e "[ ${YELLOW}SKIP${NC} ] $test_name (sudo without password required)"
+        ((SKIPPED++))
+        return
+    fi
+
+    ((TOTAL++))
+
+    local VG_DIR
+    local VG_LOG
+    VG_DIR="$(mktemp -d)"
+    VG_LOG="$VG_DIR/valgrind.log"
+
+    timeout --signal="$signal_name" 2s \
+        sudo valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+        --error-exitcode=99 --log-file="$VG_LOG" \
+        "$BIN" -i lo -t 1-65535 -w 2000 127.0.0.1 >/dev/null 2>&1
+    local EXIT_CODE=$?
+
+    local IS_PASS=0
+    if [ $EXIT_CODE -eq 124 ] && grep -q "ERROR SUMMARY: 0 errors from 0 contexts" "$VG_LOG"; then
+        IS_PASS=1
+    fi
+
+    if [ $IS_PASS -eq 1 ]; then
+        echo -e "[ ${GREEN}PASS${NC} ] $test_name"
+        ((PASSED++))
+    else
+        echo -e "[ ${RED}FAIL${NC} ] $test_name"
+        echo -e "       ${YELLOW}Signal:${NC} $signal_name"
+        echo -e "       ${YELLOW}Exit code:${NC} $EXIT_CODE"
+        echo -e "       ${YELLOW}Valgrind summary:${NC}"
+        grep -E "ERROR SUMMARY|definitely lost|indirectly lost|possibly lost|still reachable" "$VG_LOG" || true
+        ((FAILED++))
+    fi
+
+    rm -rf "$VG_DIR"
 }
 
 # ------------------------------------------
@@ -169,6 +227,10 @@ run_test "test_dns_a_aaaa_single" "tcp" "sudo $BIN -i lo -t 55001 127.0.0.1" 0
 run_test "test_timeout_short" "tcp" "sudo $BIN -i lo -t 55010 -w 5 127.0.0.1" 0
 run_test "test_timeout_long" "tcp" "sudo $BIN -i lo -t 55010 -w 2000 127.0.0.1" 0
 
+# VALGRIND + SIGNAL TERMINATION TESTS
+run_valgrind_signal_test "test_valgrind_termination_sigint" "SIGINT"
+run_valgrind_signal_test "test_valgrind_termination_sigterm" "SIGTERM"
+
 # HANDSHAKE tests (check that we can complete TCP handshake on open port and fail on closed port)
 run_test "test_lan_tcp_handshake_allowed" "tcp" "sudo $BIN -i lo -t 55001 127.0.0.1" 0
 run_test "test_lan_tcp_handshake_allowed_short_port_arg" "tcp" "sudo $BIN -i lo -t 80 127.0.0.1" 0
@@ -188,10 +250,18 @@ echo -e "${BLUE}   TEST SUMMARY                           ${NC}"
 echo -e "${BLUE}==========================================${NC}"
 
 if [ $FAILED -eq 0 ]; then
-    echo -e "   ${GREEN}All $TOTAL tests passed! ${NC} ✅"
+    if [ $SKIPPED -eq 0 ]; then
+        echo -e "   ${GREEN}All $TOTAL tests passed! ${NC} ✅"
+    else
+        echo -e "   ${GREEN}Passed: $PASSED${NC}"
+        echo -e "   ${YELLOW}Skipped: $SKIPPED${NC}"
+        echo -e "   ${YELLOW}Total run: $TOTAL${NC}"
+        echo -e "\n${YELLOW}Some tests were skipped due to missing prerequisites.${NC}"
+    fi
 else
     echo -e "   ${GREEN}Passed: $PASSED${NC}"
     echo -e "   ${RED}Failed: $FAILED${NC}"
+    echo -e "   ${YELLOW}Skipped: $SKIPPED${NC}"
     echo -e "   ${YELLOW}Total:  $TOTAL${NC}"
     echo -e "\n${RED}Some tests failed.${NC} ❌"
     exit 1
