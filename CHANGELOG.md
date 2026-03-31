@@ -1,4 +1,6 @@
-## [unreleased]
+# Changelog
+
+## v1.0.0
 
 ### 🚀 Features
 
@@ -34,13 +36,25 @@
 - *(main)* Fixing double free cause free in wrong func scope
 - *(main)* Replacing exit functions for a returns for better testing
 - *(Makefile)* Fix zip target: to name zip archive with my xlogin
+- *(Makefile)* Fixing test target
 
 ### 💼 Other
 
 - Project setup
+- *(LICENSE)* Adding GNUv3 license
+
+### 📚 Documentation
+
+- Fixing and adding aditional documentations
+- *(README.md)* Adding program documentation into README.md
+
+### 🧪 Testing
+
+- *(Unity tests)* Adding implementation for testing with unity tests
+- *(Integration tests)* Adding test for invalid port number format and screenshot of wireshark testing
 
 ### Possible future features
 
-- Adding more verbose output for better user experience
-- Adding more tests for better coverage
-- Adding multithreading for faster scanning
+- Adding more verbose output for scan results (e.g., service detection)
+- Randomizing source ports for stealthier scans
+- Asynchronous scanning to speed up large port ranges
