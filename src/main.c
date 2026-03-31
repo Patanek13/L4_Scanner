@@ -110,7 +110,7 @@ void parse_ports(const char *port_str, bool *port_arr) {
             port_arr[p_idx] = true;
           }
         } else {
-          fprintf(stderr, "Invalid port range\n");
+          fprintf(stderr, "ERROR: Invalid port range\n");
           free(str_copy);
           exit(1);
         }
@@ -119,7 +119,7 @@ void parse_ports(const char *port_str, bool *port_arr) {
       // check for non-numeric chars in port number
       for (size_t i = 0; token[i] != '\0'; i++) {
         if (!isdigit(token[i])) {
-          fprintf(stderr, "Invalid port number format\n");
+          fprintf(stderr, "ERROR: Invalid port number format\n");
           free(str_copy);
           exit(1);
         }
@@ -128,7 +128,7 @@ void parse_ports(const char *port_str, bool *port_arr) {
       if (port >= 1 && port <= MAX_PORTS) {
         port_arr[port] = true;
       } else {
-        fprintf(stderr, "Invalid port\n");
+        fprintf(stderr, "ERROR: Invalid port\n");
         free(str_copy);
         exit(1);
       }
