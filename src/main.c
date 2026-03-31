@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <net/if.h>
+#include <signal.h>
 
 // non-ANSI func declaration hidden by c11
 extern char* strdup(const char*);
@@ -33,6 +34,18 @@ bool verbose_flag = false;
 // Port 65535 is on idx 65536 
 bool scan_tcp[MAX_PORTS + 1] = {false}; 
 bool scan_udp[MAX_PORTS + 1] = {false};
+
+// Handler for SIGINT to exit corrctly
+sig_atomic_t running = 1;
+pcap_t *global_handle = NULL; // Global handle for pcap, so we can close it in signal handler
+
+void signal_handler(int sig) {
+  (void)sig; // unused param, avoid warning
+  running = 0; // Set flag to stop main loop
+  if (global_handle != NULL) {
+    pcap_breakloop(global_handle); // Break pcap loop if running 
+  }
+}
 
 // Just print help message and exit program with 0
 void print_help() {
@@ -158,6 +171,9 @@ void verbose_print(bool verbose_flag, const char *tcp_ports, const char *udp_por
 
 
 int main(int argc, char **argv) {
+  signal(SIGINT, signal_handler); // Register signal handler for SIGINT
+  signal(SIGTERM, signal_handler); // Register signal handler for SIGTERM
+
   int opt;
   char *interface = NULL;
   char *tcp_ports = NULL;
@@ -294,6 +310,12 @@ int main(int argc, char **argv) {
     }
     // Scan all specified ports
     for (int tcp_idx = 1; tcp_idx <= MAX_PORTS; tcp_idx++) {
+      if (running == 0) {
+        fprintf(stderr, "Scan interrupted by user/system. Exiting...\n");
+        freeaddrinfo(res);
+        return 0;
+      }
+
       if (scan_tcp[tcp_idx]) {
         port_status_t port_state = scan_tcp_port(interface, my_ip, IPstring, SRC_PORT, tcp_idx, timeout, verbose_flag, curr_ver);
 
@@ -310,6 +332,11 @@ int main(int argc, char **argv) {
     }
 
     for (int udp_idx = 1; udp_idx <= MAX_PORTS; udp_idx++) {
+      if (running == 0) {
+        fprintf(stderr, "Scan interrupted by user/system. Exiting...\n");
+        freeaddrinfo(res);
+        return 0;
+      }
       if (scan_udp[udp_idx]) {
         port_status_t port_state = scan_udp_port(interface, my_ip, IPstring, SRC_PORT, udp_idx, timeout, verbose_flag, curr_ver);
 
@@ -324,7 +351,5 @@ int main(int argc, char **argv) {
     }
   }
   freeaddrinfo(res);
- 
-  
   return 0;
 }

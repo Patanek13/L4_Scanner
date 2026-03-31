@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <unistd.h>
+extern pcap_t *global_handle; // Global handle for signal handler
 
 #define EXPRSIZE 256 // max size of buffer for filter expr
 #define MILISEC 1000 // num of ms in 1 sec
@@ -24,6 +25,7 @@ pcap_t *init_sniffer(const char *interface, const char *dst_ip, int src_port, in
         fprintf(stderr, "ERROR: pcap_open_live failed\n");
         exit(1);
     }
+    global_handle = handle; // Set global handle for signal handler
 
     // create text filter (same in wireshark)
     char filter_expr[EXPRSIZE];
