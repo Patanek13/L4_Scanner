@@ -9,7 +9,9 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <unistd.h>
-extern pcap_t *global_handle; // Global handle for signal handler
+
+// Shared pcap handle used by signal handlers to break active sniff loops.
+pcap_t *global_handle = NULL;
 
 #define EXPRSIZE 256 // max size of buffer for filter expr
 #define MILISEC 1000 // num of ms in 1 sec

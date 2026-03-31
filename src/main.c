@@ -37,7 +37,7 @@ bool scan_udp[MAX_PORTS + 1] = {false};
 
 // Handler for SIGINT to exit corrctly
 sig_atomic_t running = 1;
-pcap_t *global_handle = NULL; // Global handle for pcap, so we can close it in signal handler
+extern pcap_t *global_handle; // Defined in sniffer.c, shared with signal handler
 
 void signal_handler(int sig) {
   (void)sig; // unused param, avoid warning
