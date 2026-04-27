@@ -38,9 +38,10 @@ Since the application uses raw sockets and packet sniffing, it **requires root (
 **Usage:**
 
 ```bash
-sudo ./ipk-L4-scan -i <interface> -t <tcp_ports> -u <udp_ports> [-w <timeout>] <host>
+sudo ./ipk-L4-scan -v -i <interface> -t <tcp_ports> -u <udp_ports> [-w <timeout>] <host>
 Options:
   -h|--help        Show this help message and exit
+  -v               Enable verbose output (prints additional debug information to stderr)
   -i <interface>   Network interface to use (e.g., eth0, lo, tun0)
   -t <tcp_ports>   TCP ports to scan (e.g., 22,80,100-200)
   -u <udp_ports>   UDP ports to scan (e.g., 53,67,100-200)
